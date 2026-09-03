@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("INVESTIGATOR")
+  wallet    String?  // Blockchain wallet address
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  casesLead       Case[]            @relation("LeadInvestigator")
+  caseMemberships CaseMember[]
+  uploadedEvidence Evidence[]       @relation("EvidenceUploader")
+  custodyEvents   CustodyEvent[]
+}
+
+model Case {
+  id                 String       @id @default(uuid())
+  caseNumber         String       @unique // e.g., CASE-2026-0001
+  name               String
+  description        String
+  caseType           String
+  priority           String
+  incidentDate       DateTime
+  location           String
+  status             String       @default("ACTIVE")
+  leadInvestigatorId String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  leadInvestigator   User         @relation("LeadInvestigator", fields: [leadInvestigatorId], references: [id])
+  members            CaseMember[]
+  evidence           Evidence[]
+}
+
+model CaseMember {
+  id        String   @id @default(uuid())
+  caseId    String
+  userId    String
+  addedAt   DateTime @default(now())
+
+  case      Case     @relation(fields: [caseId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([caseId, userId])
+}
+
+model Evidence {
+  id             String           @id @default(uuid())
+  evidenceNumber String           @unique // e.g., EVD-000001
+  caseId         String
+  filename       String
+  mimeType       String
+  size           Int
+  storagePath    String
+  originalHash   String
+  currentHash    String
+  currentVersion Int              @default(1)
+  status         String           @default("PENDING")
+  createdById    String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  case           Case             @relation(fields: [caseId], references: [id])
+  createdBy      User             @relation("EvidenceUploader", fields: [createdById], references: [id])
+  versions       EvidenceVersion[]
+  custodyEvents  CustodyEvent[]
+}
+
+model EvidenceVersion {
+  id           String   @id @default(uuid())
+  evidenceId   String
+  version      Int
+  hash         String
+  previousHash String?
+  operation    String
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  evidence     Evidence @relation(fields: [evidenceId], references: [id])
+}
+
+model CustodyEvent {
+  id                String   @id @default(uuid())
+  evidenceId        String
+  eventType         String   // UPLOAD, ACCESS, ANALYSIS, TRANSFER, VERIFICATION
+  actorId           String
+  description       String?
+  eventHash         String   // Current event hash
+  previousEventHash String?  // Chain of custody linkage
+  blockchainTxId    String?
+  timestamp         DateTime @default(now())
+
+  evidence          Evidence @relation(fields: [evidenceId], references: [id])
+  actor             User     @relation(fields: [actorId], references: [id])
+}
+
+model BlockchainTransaction {
+  id           String   @id @default(uuid())
+  txHash       String   @unique
+  eventType    String
+  caseId       String?
+  evidenceId   String?
+  actorWallet  String
+  status       String   // PENDING, CONFIRMED, FAILED
+  timestamp    DateTime @default(now())
+}
