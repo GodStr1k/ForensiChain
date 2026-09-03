@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "http-link-header": "^1.1.4",
+    "isomorphic-git": "^1.41.9"
+  }
+}
